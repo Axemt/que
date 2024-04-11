@@ -1,0 +1,43 @@
+[project]
+name = "que"
+version = "0.1.0"
+authors = [
+    {name = "Jorge Jiménez García", email = "jjimgar1@outlook.com"},
+]
+description = "Query your documents"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = [
+    "transformers",
+    "llama-cpp-python",
+    "huggingface_hub",
+    "pdfminer.six",
+    "python-docx",
+    "chromadb"
+]
+
+[project.optional-dependencies]
+test = [
+    "coverage",
+]
+
+[tool.coverage.run]
+omit = [
+    "que/**/__init__.py",
+    "que/cli.py",
+]
+
+[tool.setuptools]
+packages = ["que"]
+
+[project.scripts]
+que = "que.cli:main_query"
