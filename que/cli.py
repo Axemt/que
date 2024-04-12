@@ -67,9 +67,12 @@ def main_query(*args, **kwargs):
     
     llm = make_llama(verbose=is_verbose, k=db.k, window_size=db.window_size)
 
-    oneshot_query(
+    llm_response = oneshot_query(
         llm=llm,
         query=query,
         context=context,
         is_verbose=is_verbose
     )
+
+    print()
+    print(llm_response)

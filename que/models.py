@@ -38,8 +38,7 @@ def oneshot_query(llm: Llama, query: str, context: str, is_verbose: bool = False
     
     llm_response = llm_do_chat(llm, messages, is_verbose=is_verbose)
 
-    print()
-    print(llm_response)
+    return llm_response
 
 def llm_do_chat(llm: Llama, messages: List[Dict[str, str]], is_verbose: bool = False) -> str:
     llm_response = llm.create_chat_completion(

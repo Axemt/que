@@ -185,21 +185,20 @@ class DirectoryStore:
         """
         fmap = []
 
-        # FIXME: Make some sort of supported decoder API that has the types of files accepted, their decoder, etc
-        files = glob.glob('**/*.md', recursive=recursive) 
-        files += glob.glob('**/*.txt', recursive=recursive)
-        files += glob.glob('**/*.pdf', recursive=recursive)
-        files += glob.glob('**/*.docx', recursive=recursive)
+        files = [
+            glob.iglob('**/*.md', recursive=recursive) ,
+            glob.iglob('**/*.txt', recursive=recursive),
+            glob.iglob('**/*.pdf', recursive=recursive),
+            glob.iglob('**/*.docx', recursive=recursive),
+        ]
         
         if self.v: print(f'Exploring directory {os.path.abspath(".")}')
-        for fname in files:
-            abs_fname = os.path.abspath(fname)
-            # NOTE: Add an exception for the stupid Excalidraw diagrams
-            #if 'Excalidraw' in abs_fname:
-            #    continue
+        for file_group in files:
+            for fname in file_group:
+                abs_fname = os.path.abspath(fname)
 
-            if self.v: print('\tFound', abs_fname)
-            fmap.append(abs_fname)
+                if self.v: print('\tFound', abs_fname)
+                fmap.append(abs_fname)
 
         return fmap
     
@@ -362,6 +361,7 @@ def read_file(abs_fname: str | os.PathLike) -> str:
 
     doctype = abs_fname[ abs_fname.rfind('.')+1: ]
 
+    # FIXME: Make some sort of supported decoder API that has the types of files accepted, their decoder, etc
     if doctype in ['txt', 'md']:
         return read_raw_text_file(abs_fname)
     elif doctype == 'pdf':
