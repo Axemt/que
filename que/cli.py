@@ -1,7 +1,8 @@
 import argparse
+from argparse import ArgumentParser
 from que.store import DirectoryStore
 from que.prompts import QUERY_SYSTEM_PROMPT
-from que.models import make_llama, oneshot_query
+from que.models import make_llama, oneshot_query, continue_as_interactive_query
 
 
 def main_query(*args, **kwargs):
@@ -11,6 +12,13 @@ def main_query(*args, **kwargs):
     parser.add_argument(
         'query',
         help='The question to ask your files',
+    )
+
+    parser.add_argument(
+        '-i',
+        '--interactive',
+        help='Query as a chat session',
+        action='store_true'
     )
     
     parser.add_argument(
@@ -49,30 +57,41 @@ def main_query(*args, **kwargs):
     k = args.doc_chunks_k
     is_verbose = args.verbose
     is_query_only = args.query_only
-    is_scoped_local_search = args.local
+    is_interactive = args.interactive
 
     db = DirectoryStore(k=k, is_verbose=is_verbose)
 
+    is_scoped_local_search = args.local
+    dir_scope = None if not is_scoped_local_search else '.'
 
     context = db.query(
-        query,
+        args.query,
         return_formatted_context=True,
-        dir_scope=None if not is_scoped_local_search else '.'    
+        dir_scope=dir_scope
     )
     
+
     if is_query_only:
         print(context)
         exit()
 
-    
     llm = make_llama(verbose=is_verbose, k=db.k, window_size=db.window_size)
 
     llm_response = oneshot_query(
         llm=llm,
         query=query,
         context=context,
-        is_verbose=is_verbose
+        is_verbose=is_verbose,
+        continues=is_interactive
     )
 
     print()
-    print(llm_response)
+    print(llm_response[0] if is_interactive else llm_response)
+    
+    if not is_interactive:
+        exit()
+
+    _llm_txt_response, messages = llm_response
+    continue_as_interactive_query(llm, db, messages, is_verbose=is_verbose, dir_scope=dir_scope)
+    
+    

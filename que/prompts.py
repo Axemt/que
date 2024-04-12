@@ -10,6 +10,15 @@ Don't try to make up an answer. Don't make up new terms and try to be precise.
 You can add context if you are very very sure about your information.
 {context}"""
 
+FOLLOWUP_SYSTEM_PROMPT = """
+We have the chance to enhance or further add to the user's queries with additional pieces of context.
+You may recall or use previously provided pieces of context.
+Answer only the latest follow up query by the user. Do not need to repeat previous answers.
+Give only an answer to the specific user request and nothing else.
+Do not try to make up an answer. Do not make up new terms and try to be precise.
+{context}
+"""
+
 CONTEXT_TEMPLATE = """
 <|source|> : {fname}
 {snippet}
