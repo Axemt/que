@@ -373,8 +373,8 @@ def read_file(abs_fname: str | os.PathLike) -> str:
             warn(f'The pdf file {abs_fname} has invalid or wonky encoding: {str(e)}')
     elif doctype == 'docx':
         return read_docx_file(abs_fname)
-    
-    warn(f'doctype did not match: doctype={doctype}')
+    else:
+        warn(f'doctype did not match: doctype={doctype}')
     return ''
     
     
