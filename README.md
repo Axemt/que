@@ -9,3 +9,7 @@ The `que` command line utility recursively indexes the documents in any director
 On following invocations, `que` re-checks if the indexed files have changed or have been deleted, or if new documents are present, and updates the internal vector database, avoiding an expensive re-indexing of files.
 
 `que` relies on `llama-cpp`, a fast inference implementation compatible with MPS, CUDA and Vulkan.
+
+## See it in action:
+
+![example](example.jpg)
