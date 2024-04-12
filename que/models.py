@@ -1,11 +1,22 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from llama_cpp import Llama
 from llama_cpp.llama_speculative import LlamaPromptLookupDecoding
 from pprint import pprint
 from que.prompts import QUERY_SYSTEM_PROMPT, FOLLOWUP_SYSTEM_PROMPT
 from que.store import DirectoryStore
 
-def make_llama(verbose: bool = False, k: int = 5, window_size: int = 100) -> Llama:
+def make_llama(is_verbose: bool = False, k: int = 5, window_size: int = 100) -> Llama:
+    """
+    Return an instance of a LLama2 model
+
+    Kwargs:
+        is_verbose: Enable the model's verbose logging
+        k: The number of context snippets. Used to calculate the size of the context window
+        window_size: The length of the context snippets. Used to calculate the size of the context window
+
+    Returns:
+        a LLama2 instance
+    """
     model_id = "TheBloke/Llama-2-7B-Chat-GGUF"
 
     model = Llama.from_pretrained(
@@ -14,13 +25,34 @@ def make_llama(verbose: bool = False, k: int = 5, window_size: int = 100) -> Lla
         n_ctx= 8 * window_size * k,
         n_gpu_layers=-1,
         chat_format='llama-2',
-        verbose=verbose,
+        verbose=is_verbose,
         draft_model=LlamaPromptLookupDecoding(num_pred_tokens=10)
     )
 
     return model
 
-def oneshot_query(llm: Llama, query: str, context: str, is_verbose: bool = False, continues: bool = False):
+def oneshot_query(
+    llm: Llama,
+    query: str,
+    context: str,
+    is_verbose: bool = False,
+    continues: bool = False
+    ) -> str | Tuple[str, List[Dict[str, str]]]:
+    """
+    Performs a LLM text generation
+
+    Args:
+        llm: A LLama2 instance
+        query: The user query
+        context: The document chunks retrieved
+
+    Kwargs:
+        is_verbose: Enable verbose logging
+        continues: If `True`, also return the message log given to the LLM for completion
+    
+    Returns:
+        The generated LLM response, and the used message log if `continues=True`
+    """
 
     messages = [
         {
@@ -43,7 +75,20 @@ def continue_as_interactive_query(
         db: DirectoryStore,
         messages: List[Dict[str, str]],
         is_verbose: bool = False, 
-        dir_scope: str | None = None):
+        dir_scope: str | None = None
+    ):
+    """
+    Continues an existing query as an interactive LLM chat
+
+    Args:
+        llm: A LLama2 instance
+        db: The DirectoryStore instance, used for further context retrieval
+        messages: The message log used for a first llm completion
+
+    Kwargs:
+        is_verbose: Enable verbose logging
+        dir_scope: Restrict document retrieval to the specified directory
+    """
 
     print()
     print('>>Continuing as chat session. Press Ctrl+C or Ctrl+D to exit')
@@ -79,7 +124,24 @@ def continue_as_interactive_query(
         pass
 
 
-def llm_do_chat(llm: Llama, messages: List[Dict[str, str]], is_verbose: bool = False) -> str:
+def llm_do_chat(
+        llm: Llama, 
+        messages: List[Dict[str, str]],
+        is_verbose: bool = False
+    ) -> str:
+    """
+    Generate text from the given messages
+
+    Args:
+        llm: A LLama2 instance
+        messages: The message log for llm completion
+
+    Kwargs:
+        is_verbose: Enable verbose logging
+
+    Returns:
+        The generated llm text
+    """
 
     if is_verbose:
         pprint(messages)

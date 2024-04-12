@@ -78,7 +78,7 @@ def main_query(*args, **kwargs):
         print(context)
         exit()
 
-    llm = make_llama(verbose=is_verbose, k=db.k, window_size=db.window_size)
+    llm = make_llama(is_verbose=is_verbose, k=db.k, window_size=db.window_size)
 
     llm_response = oneshot_query(
         llm=llm,
