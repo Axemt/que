@@ -3,6 +3,9 @@ import chromadb
 import glob
 import os
 import hashlib
+import ebooklib
+from ebooklib import epub
+from bs4 import BeautifulSoup
 from pdfminer.high_level import extract_text as read_pdf_file
 from pdfminer.pdfdocument import PDFTextExtractionNotAllowed
 from pdfminer.psparser import PSSyntaxError
@@ -190,6 +193,7 @@ class DirectoryStore:
             glob.iglob('**/*.txt', recursive=recursive),
             glob.iglob('**/*.pdf', recursive=recursive),
             glob.iglob('**/*.docx', recursive=recursive),
+            glob.iglob('**/*.epub', recursive=recursive),
         ]
         
         if self.v: print(f'Exploring directory {os.path.abspath(".")}')
@@ -373,6 +377,8 @@ def read_file(abs_fname: str | os.PathLike) -> str:
             warn(f'The pdf file {abs_fname} has invalid or wonky encoding: {str(e)}')
     elif doctype == 'docx':
         return read_docx_file(abs_fname)
+    elif doctype == 'epub':
+        return read_epub_file(abs_fname)
     else:
         warn(f'doctype did not match: doctype={doctype}')
     return ''
@@ -411,6 +417,18 @@ def read_docx_file(abs_fname: str | os.PathLike) -> str:
     for para in doc.paragraphs:
         fullText.append(para.text)
     return '\n'.join(fullText)
+
+def read_epub_file(abs_fname: str | os.PathLike) -> str:
+
+
+    book = epub.read_epub(abs_fname)
+    content = ''
+    for item in book.get_items():
+        if item.get_type() == ebooklib.ITEM_DOCUMENT:
+            bodyContent = item.get_body_content().decode()
+            content += BeautifulSoup(bodyContent).get_text().strip()
+
+    return content
 
 
 def get_file_fingerprint(
