@@ -59,6 +59,9 @@ def main_query(*args, **kwargs):
     is_query_only = args.query_only
     is_interactive = args.interactive
 
+    err_msg_both_interactive_and_query_only_flags = f'Query only flag = {is_query_only} and Interactive flag = {is_interactive}, but only one is allowed'
+    assert is_query_only ^ is_interactive or (is_query_only == is_interactive and not is_interactive), err_msg_both_interactive_and_query_only_flags
+    
     db = DirectoryStore(k=k, is_verbose=is_verbose)
 
     is_scoped_local_search = args.local
