@@ -5,26 +5,28 @@ from pprint import pprint
 from que.prompts import QUERY_SYSTEM_PROMPT, FOLLOWUP_SYSTEM_PROMPT
 from que.store import DirectoryStore
 
-def make_llama(is_verbose: bool = False, k: int = 5, window_size: int = 100) -> Llama:
+def make_llama(
+        is_verbose: bool = False,
+        ctx_window_size: int = 4096,
+    ) -> Llama:
     """
     Return an instance of a LLama2 model
 
     Kwargs:
         is_verbose: Enable the model's verbose logging
-        k: The number of context snippets. Used to calculate the size of the context window
-        window_size: The length of the context snippets. Used to calculate the size of the context window
+        ctx_window_size: The size of the context window
 
     Returns:
-        a LLama2 instance
+        a LLama instance
     """
-    model_id = "TheBloke/Llama-2-7B-Chat-GGUF"
+    model_id = "cognitivecomputations/dolphin-2.9-llama3-8b-gguf"#"TheBloke/Llama-2-7B-Chat-GGUF"
 
     model = Llama.from_pretrained(
         repo_id=model_id,
-        filename="*Q5_K_M.gguf",
-        n_ctx= 8 * window_size * k,
+        filename="*q5_K_M.gguf",
+        n_ctx=ctx_window_size,
         n_gpu_layers=-1,
-        chat_format='llama-2',
+        chat_format='chatml',
         verbose=is_verbose,
         draft_model=LlamaPromptLookupDecoding(num_pred_tokens=10)
     )
