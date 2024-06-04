@@ -3,7 +3,9 @@ from argparse import ArgumentParser
 from que.store import DirectoryStore
 from que.prompts import QUERY_SYSTEM_PROMPT
 from que.models import make_llama, oneshot_query, continue_as_interactive_query
-
+from ast import literal_eval
+from typing import Dict
+from pprint import pprint
 
 def main_query(*args, **kwargs):
 
@@ -69,13 +71,11 @@ def main_query(*args, **kwargs):
 
     context = db.query(
         args.query,
-        return_formatted_context=True,
         dir_scope=dir_scope
     )
-    
 
     if is_query_only:
-        print(context)
+        print(db.format_context(context))
         exit()
 
     llm = make_llama(is_verbose=is_verbose)
@@ -83,18 +83,51 @@ def main_query(*args, **kwargs):
     llm_response = oneshot_query(
         llm=llm,
         query=query,
-        context=context,
+        context=db.format_context(context),
         is_verbose=is_verbose,
         continues=is_interactive
     )
 
-    print()
-    print(llm_response[0] if is_interactive else llm_response)
+
+    print(
+        format_context_highlight(
+            llm_response[0] if is_interactive else llm_response,
+            context,
+        )
+    )
     
     if not is_interactive:
         exit()
 
     _llm_txt_response, messages = llm_response
-    continue_as_interactive_query(llm, db, messages, is_verbose=is_verbose, dir_scope=dir_scope)
+    continue_as_interactive_query(
+        llm,
+        db,
+        messages,
+        is_verbose=is_verbose,
+        print_hook=format_context_highlight,
+        dir_scope=dir_scope
+    )
     
+def highlight(s):
+    return "\x1b[1;32m" + s + "\x1b[0m"
+
+def format_context_highlight(llm_response: Dict[str, str], context: Dict) -> str:
+
+    llm_response = literal_eval(llm_response)
+
+    res = ''
+    res += llm_response['answer'] + '\n'
+    res += '-'*10 + f"confidence in answer:{llm_response['confidence_score']}" + '-'*10 + '\n'
     
+    if not llm_response['found_an_answer']:
+        return res
+
+
+    for doc_text, meta in zip(context['documents'][0], context['metadatas'][0]):
+        
+        for fname, exact_snip in llm_response['source_snippets'].items():
+            if fname == meta['source'] and exact_snip in doc_text:
+                res += f"{meta['source']}:\n{doc_text}\n\n".replace(exact_snip, highlight(exact_snip))
+
+    return res

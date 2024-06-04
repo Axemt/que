@@ -280,7 +280,6 @@ class DirectoryStore:
     def query(
         self, 
         query_txt: str,
-        return_formatted_context: bool = False,
         dir_scope: str = None
         ) -> str | Dict:
         """
@@ -290,7 +289,6 @@ class DirectoryStore:
             query_txt: The query, in text form
 
         Kwargs: 
-            return_formatted_context: Whether to return the query as a formatted string with the documents in readable form or as a raw DB query
             dir_scope: Restrict the query to documents within the `dir_scope` folder.
         Returns:
             Formatted string with the documents or raw DB query results
@@ -327,17 +325,9 @@ class DirectoryStore:
             where=dir_scope
         )
 
-        if return_formatted_context:
-            
-            context = ''
-            for snippet, meta in zip(results['documents'][0], results['metadatas'][0]):
-                context += self.format_context(snippet=snippet, fname=meta['source'])
-
-            return context
-
         return results
 
-    def format_context(self, snippet: str, fname: str):
+    def format_context(self, context: Dict[str, str]):
         """
         Format `CONTEXT_TEMPLATE` using the provided snippet and file name
 
@@ -346,11 +336,19 @@ class DirectoryStore:
             fname: The name of the source file
         """
 
-        is_tipped = snippet.find(self.tip_token)
-        if is_tipped != -1:
-            snippet = snippet[ is_tipped + len(self.tip_token) + 1 : ]
+            
+        res = ''
+        for snippet, meta in zip(context['documents'][0], context['metadatas'][0]):
+            
+            
+            is_tipped = snippet.find(self.tip_token)
+            if is_tipped != -1:
+                snippet = snippet[ is_tipped + len(self.tip_token) + 1 : ]
+            
+            res += CONTEXT_TEMPLATE.format(fname=meta['source'], snippet=snippet.replace(self.pad_token, '').strip())
 
-        return CONTEXT_TEMPLATE.format(fname=fname, snippet=snippet.replace(self.pad_token, '').strip())
+        return res
+
         
 def read_file(abs_fname: str | os.PathLike) -> str:
     """

@@ -1,13 +1,14 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Callable
 from llama_cpp import Llama
 from llama_cpp.llama_speculative import LlamaPromptLookupDecoding
 from pprint import pprint
 from que.prompts import QUERY_SYSTEM_PROMPT, FOLLOWUP_SYSTEM_PROMPT
 from que.store import DirectoryStore
+from ast import literal_eval
 
 def make_llama(
         is_verbose: bool = False,
-        ctx_window_size: int = 4096,
+        ctx_window_size: int = 16_384,
     ) -> Llama:
     """
     Return an instance of a LLama2 model
@@ -76,6 +77,7 @@ def continue_as_interactive_query(
         llm: Llama,
         db: DirectoryStore,
         messages: List[Dict[str, str]],
+        print_hook: None | Callable = None,
         is_verbose: bool = False, 
         dir_scope: str | None = None
     ):
@@ -93,22 +95,21 @@ def continue_as_interactive_query(
     """
 
     print()
-    print('>>Continuing as chat session. Press Ctrl+C or Ctrl+D to exit')
-    print('>>----------------------------------------------------------')
+    print('>> Continuing as chat session. Press Ctrl+C or Ctrl+D to exit')
+    print('>> ----------------------------------------------------------')
     try:
         while True:
-            followup_query = input('>>')
+            followup_query = input('>> ')
 
             followup_context = db.query(
                 followup_query,
-                return_formatted_context=True,
                 dir_scope=dir_scope
             )
 
             messages += [
                 {
                     'role': 'system',
-                    'content': FOLLOWUP_SYSTEM_PROMPT.format(context=followup_context)
+                    'content': db.format_context(followup_context)
                 },
                 {
                     'role': 'user',
@@ -117,7 +118,10 @@ def continue_as_interactive_query(
             ]
 
             llm_response = llm_do_chat(llm, messages, is_verbose=is_verbose)
-            print()
+
+            if print_hook is not None:
+                llm_response = print_hook(llm_response, followup_context)
+
             print(llm_response)
             print()
 
