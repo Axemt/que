@@ -2,13 +2,12 @@ from typing import List, Dict, Tuple, Callable
 from llama_cpp import Llama
 from llama_cpp.llama_speculative import LlamaPromptLookupDecoding
 from pprint import pprint
-from que.prompts import QUERY_SYSTEM_PROMPT, FOLLOWUP_SYSTEM_PROMPT
+from que.prompts import QUERY_SYSTEM_PROMPT
 from que.store import DirectoryStore
-from ast import literal_eval
 
 def make_llama(
         is_verbose: bool = False,
-        ctx_window_size: int = 16_384,
+        ctx_window_size: int = 32_768,
     ) -> Llama:
     """
     Return an instance of a LLama2 model
@@ -20,7 +19,7 @@ def make_llama(
     Returns:
         a LLama instance
     """
-    model_id = "cognitivecomputations/dolphin-2.9-llama3-8b-gguf"#"TheBloke/Llama-2-7B-Chat-GGUF"
+    model_id = "cognitivecomputations/dolphin-2.9-llama3-8b-gguf"
 
     model = Llama.from_pretrained(
         repo_id=model_id,
