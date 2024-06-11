@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Callable
 import chromadb
 import glob
 import os
@@ -19,12 +19,9 @@ class DirectoryStore:
 
     def __init__(
             self, 
-            window_size: int = 100,
-            step_size: int = 70,
+            window_size: int = 50,
+            step_size: int = 50,
             k: int = 5,
-            device: str = 'mps',
-            pad_token: str = '<|NULL|>',
-            tip_token: str = '<TIP>',
             is_verbose: bool = False
         ) -> None:
         
@@ -37,13 +34,9 @@ class DirectoryStore:
         self.step_size = step_size
         self.window_size = window_size
 
-        self.pad_token = pad_token
-        self.tip_token = tip_token
-
 
         self.collection = chromadb.PersistentClient(path=self.findex_name).get_or_create_collection(
-            name='tomes',
-            metadata={"hnsw:space": "cosine"}
+            name='tomes'
         )
 
         # update with new data
@@ -53,11 +46,6 @@ class DirectoryStore:
         # purge from non-existent/non-updated files and their tomes
         if self.v: print('Updating db to current filesystem state...')
         self.db_update_to_current_files(files_in_dir=fmap_in_current_dir)
-        
-
-        # rewrite index
-        # chromadb is persisted automatically?
-
 
 
     def db_update_to_current_files(self, files_in_dir: List[str] = []):
@@ -167,7 +155,7 @@ class DirectoryStore:
 
 
         if len(ids) > 0:
-            if self.v: print(f'\nAdding {len(ids)} text snippets to DB. This might take a while...')
+            if self.v or len(ids) > 1_000: print(f'\nAdding {len(ids)} text snippets to DB. This might take a while...')
             self.collection.upsert(
                 ids=ids,
                 documents=documents,
@@ -200,7 +188,6 @@ class DirectoryStore:
         for file_group in files:
             for fname in file_group:
                 abs_fname = os.path.abspath(fname)
-
                 if self.v: print('\tFound', abs_fname)
                 fmap.append(abs_fname)
 
@@ -210,7 +197,6 @@ class DirectoryStore:
         self,
           abs_fname: str | os.PathLike, 
           fingerprint: str | None = None,
-          use_tips: bool = True
         ) -> bool | Tuple[List[str], List[Dict[str, str]], List[str]]:
         """
         Prepare a file to insert in the DB store
@@ -228,16 +214,17 @@ class DirectoryStore:
         txt = read_file(abs_fname).strip()
         if txt == '': return False
 
-        tip = None
-        if use_tips:
-            tip = abs_fname[ abs_fname.rfind('/') + 1: ]
-
-        txt_chunks = self.chunkify(txt, tip=tip)
+        txt_chunks = self.chunkify(txt)
 
         ids = [ f'{abs_fname}-chk-{i}' for i in range(len(txt_chunks))]
 
         if fingerprint is None: fingerprint = get_file_fingerprint(abs_fname)
-        metadatas = [ {'source': abs_fname, 'fingerprint': fingerprint} ] * len(txt_chunks)
+        metadatas = [ 
+            {
+                'source': abs_fname,
+                'fingerprint': fingerprint,
+            } 
+        ] * len(txt_chunks)
         
         documents = txt_chunks
 
@@ -247,7 +234,6 @@ class DirectoryStore:
     def chunkify(
         self,
         document_txt: str, 
-        tip: str | None
         ) -> List[str]:
         """
         Convert a string into text chunks
@@ -259,19 +245,17 @@ class DirectoryStore:
             A list with the text chunks
         """
 
-        document_txt = " ".join(document_txt.split())
         text_tokens = document_txt.split()
 
-        tip = [f"{tip} {self.tip_token}" if tip is not None else '']
 
         sentences = []
         for i in range(0 , len(text_tokens) , self.step_size):
-            sentence = tip + text_tokens[i : i + self.window_size]
+            sentence = text_tokens[i : i + self.window_size]
+            
             if (len(sentence) < self.window_size):
-                # pad the sequence
-                sentence += [self.pad_token] * (self.window_size - len(sentence))
                 sentences.append(sentence)
                 break
+
             sentences.append(sentence)
 
         paragraphs = [" ".join(s) for s in sentences]
@@ -340,12 +324,7 @@ class DirectoryStore:
         res = ''
         for snippet, meta in zip(context['documents'][0], context['metadatas'][0]):
             
-            
-            is_tipped = snippet.find(self.tip_token)
-            if is_tipped != -1:
-                snippet = snippet[ is_tipped + len(self.tip_token) + 1 : ]
-            
-            res += CONTEXT_TEMPLATE.format(fname=meta['source'], snippet=snippet.replace(self.pad_token, '').strip())
+            res += CONTEXT_TEMPLATE.format(fname=meta['source'], snippet=snippet.strip())
 
         return res
 
@@ -411,10 +390,10 @@ def read_docx_file(abs_fname: str | os.PathLike) -> str:
         The text content of the file
     """
     doc = Document(abs_fname)
-    fullText = []
+    full_text = []
     for para in doc.paragraphs:
-        fullText.append(para.text)
-    return '\n'.join(fullText)
+        full_text.append(para.text)
+    return '\n'.join(full_text)
 
 def read_epub_file(abs_fname: str | os.PathLike) -> str:
 
@@ -423,8 +402,8 @@ def read_epub_file(abs_fname: str | os.PathLike) -> str:
     content = ''
     for item in book.get_items():
         if item.get_type() == ebooklib.ITEM_DOCUMENT:
-            bodyContent = item.get_body_content().decode()
-            content += BeautifulSoup(bodyContent).get_text().strip()
+            body_content = item.get_body_content().decode()
+            content += BeautifulSoup(body_content).get_text().strip()
 
     return content
 
