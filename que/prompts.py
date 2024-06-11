@@ -6,6 +6,8 @@ The source documents have the following format: "<|source|> : /path/to/source/fi
 
 Here are the source documents: {context}
 
+End of sources.
+
 
 You should provide your answer as a JSON blob, and also provide all relevant short source snippets from the documents on which you directly based your answer, and a confidence score as a float between 0 and 1. Do not use the file paths as snippets.
 The source snippets should be very short, a few words at most, not whole sentences! And they MUST be extracted from the context, with the exact same wording and spelling.
@@ -15,7 +17,7 @@ Your answer should be built as follows
 {{
   "answer": your_answer,
   "confidence_score": your_confidence_score,
-  "found_an_answer": True | False, 
+  "found_an_answer": True | False,
   "source_snippets": {{
     "/path/to/snippet1/file": "snippet1",
     "/path/to/snippet2/file": "snippet2",
@@ -24,7 +26,9 @@ Your answer should be built as follows
 }}
 <|endoftext|>
 
-If your answer satisfies the user's query, set "found_an_answer" to "False". If it does, set it to "True"
+If your answer satisfies the user's query, set "found_an_answer" to "True". If it does not, set it to "False". 
+You must end the JSON blob by using "<|endoftext|>"
+
 Now begin!
 """
 

@@ -1,10 +1,9 @@
 import argparse
-from argparse import ArgumentParser
 from que.store import DirectoryStore
-from que.prompts import QUERY_SYSTEM_PROMPT
 from que.models import make_llama, oneshot_query, continue_as_interactive_query
 from ast import literal_eval
 from typing import Dict
+from os import path
 from pprint import pprint
 
 def main_query(*args, **kwargs):
@@ -27,7 +26,7 @@ def main_query(*args, **kwargs):
         '-k',
         '--doc_chunks_k',
         help='The number of document chunks to use as context',
-        default=3,
+        default=5,
         type=int
     )
 
@@ -42,7 +41,7 @@ def main_query(*args, **kwargs):
         '-l',
         '--local',
         help='Restrict the search to the current folder',
-        action='store_true'
+        action='store_true',
     )
 
     parser.add_argument(
@@ -75,7 +74,7 @@ def main_query(*args, **kwargs):
     )
 
     if is_query_only:
-        print(db.format_context(context))
+        print(db.format_context(context).replace( path.expanduser('~'), '~' ))
         exit()
 
     llm = make_llama(is_verbose=is_verbose)
@@ -117,8 +116,8 @@ def format_context_highlight(llm_response: Dict[str, str], context: Dict) -> str
     llm_response = literal_eval(llm_response)
 
     res = ''
-    res += llm_response['answer'] + '\n'
-    res += '-'*10 + f"confidence in answer:{llm_response['confidence_score']}" + '-'*10 + '\n'
+    res += highlight(llm_response['answer']) + '\n\n'
+    res += '-'*10 + f"confidence in answer:{llm_response['confidence_score']}" + '-'*10 + '\n\n'
     
     if not llm_response['found_an_answer']:
         return res
@@ -128,6 +127,6 @@ def format_context_highlight(llm_response: Dict[str, str], context: Dict) -> str
         
         for fname, exact_snip in llm_response['source_snippets'].items():
             if fname == meta['source'] and exact_snip in doc_text:
-                res += f"{meta['source']}:\n{doc_text}\n\n".replace(exact_snip, highlight(exact_snip))
+                res += f"{meta['source'].replace( path.expanduser('~'), '~' )}:\n{doc_text}\n\n".replace(exact_snip, highlight(exact_snip))
 
     return res
