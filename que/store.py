@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup
 from pdfminer.high_level import extract_text as read_pdf_file
 from pdfminer.pdfdocument import PDFTextExtractionNotAllowed
 from pdfminer.psparser import PSSyntaxError
-from que.prompts import CONTEXT_TEMPLATE
 from warnings import warn
 from docx import Document
 
@@ -311,20 +310,23 @@ class DirectoryStore:
 
         return results
 
-    def format_context(self, context: Dict[str, str]):
+    def format_context(self, context: Dict[str, str], context_template: str):
         """
         Format `CONTEXT_TEMPLATE` using the provided snippet and file name
 
         Args:
-            snippet: The document snippet
-            fname: The name of the source file
+            context: The context documents
+            context_template: A format string with fields `fname` and `snippet`
+
+        Returns:
+            The formatted `context_template` string
         """
 
             
         res = ''
         for snippet, meta in zip(context['documents'][0], context['metadatas'][0]):
             
-            res += CONTEXT_TEMPLATE.format(fname=meta['source'], snippet=snippet.strip())
+            res += context_template.format(fname=meta['source'], snippet=snippet.strip())
 
         return res
 

@@ -1,4 +1,15 @@
-QUERY_SYSTEM_PROMPT = """Answer the user query based on the source documents.
+verbose = false
+
+[documents]
+n_documents_per_query = 5
+
+[model]
+model_id = "cognitivecomputations/dolphin-2.9-llama3-8b-gguf"
+quant = "*q5_K_M.gguf"
+
+
+[prompts]
+system_prompt = """Answer the user query based on the source documents.
 
 The source documents have the following format: "<|source|> : /path/to/source/file
 ...
@@ -32,13 +43,14 @@ You must end the JSON blob by using "<|endoftext|>"
 Now begin!
 """
 
-FOLLOWUP_SYSTEM_PROMPT = """
+followup_prompt = """
 We have the opportunity to further add to the user's queries with additional pieces of context.
 You may recall or use previously provided pieces of context.
-""" + "{context}"
+"{context}"
+"""
 
 
-CONTEXT_TEMPLATE = """
+context_template = """
 <|source|> : {fname}
 {snippet}
 """

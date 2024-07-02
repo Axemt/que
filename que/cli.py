@@ -1,6 +1,7 @@
 import argparse
 from que.store import DirectoryStore
 from que.models import make_llama, oneshot_query, continue_as_interactive_query
+from que.config import QUECONFIG
 from ast import literal_eval
 from typing import Dict
 from os import path
@@ -18,7 +19,7 @@ def main_query(*args, **kwargs):
     parser.add_argument(
         '-i',
         '--interactive',
-        help='Query as a chat session',
+        help='Query as an interactive chat session',
         action='store_true'
     )
     
@@ -26,7 +27,7 @@ def main_query(*args, **kwargs):
         '-k',
         '--doc_chunks_k',
         help='The number of document chunks to use as context',
-        default=5,
+        default=QUECONFIG['documents']['n_documents_per_query'],
         type=int
     )
 
@@ -48,7 +49,8 @@ def main_query(*args, **kwargs):
         '-v',
         '--verbose',
         help='Enable verbosity',
-        action='store_true'
+        action='store_true',
+        default=QUECONFIG['verbose']
     )
 
 
@@ -74,15 +76,20 @@ def main_query(*args, **kwargs):
     )
 
     if is_query_only:
-        print(db.format_context(context).replace( path.expanduser('~'), '~' ))
+        print(db.format_context(context, QUECONFIG['prompts']['context_template']).replace( path.expanduser('~'), '~' ))
         exit()
 
-    llm = make_llama(is_verbose=is_verbose)
+    llm = make_llama(
+        QUECONFIG['model']['model_id'],
+        QUECONFIG['model']['quant'],
+        is_verbose=is_verbose
+    )
 
-    llm_response = oneshot_query(
+    llm_response, messages = oneshot_query(
         llm=llm,
         query=query,
-        context=db.format_context(context),
+        query_system_prompt=QUECONFIG['prompts']['system_prompt'],
+        context=db.format_context(context, QUECONFIG['prompts']['context_template']),
         is_verbose=is_verbose,
         continues=is_interactive
     )
@@ -90,7 +97,7 @@ def main_query(*args, **kwargs):
 
     print(
         format_context_highlight(
-            llm_response[0] if is_interactive else llm_response,
+            llm_response,
             context,
         )
     )
@@ -98,11 +105,11 @@ def main_query(*args, **kwargs):
     if not is_interactive:
         exit()
 
-    _llm_txt_response, messages = llm_response
     continue_as_interactive_query(
         llm,
         db,
         messages,
+        QUECONFIG['prompts']['context_template'],
         is_verbose=is_verbose,
         print_hook=format_context_highlight,
         dir_scope=dir_scope

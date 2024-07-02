@@ -24,7 +24,8 @@ dependencies = [
     "python-docx",
     "ebooklib",
     "bs4",
-    "chromadb"
+    "chromadb",
+    "toml"
 ]
 
 [project.optional-dependencies]
@@ -40,6 +41,9 @@ omit = [
 
 [tool.setuptools]
 packages = ["que"]
+
+[tool.setuptools.package-data]
+que = ["default_config.toml"]
 
 [project.scripts]
 que = "que.cli:main_query"

@@ -2,16 +2,20 @@ from typing import List, Dict, Tuple, Callable
 from llama_cpp import Llama
 from llama_cpp.llama_speculative import LlamaPromptLookupDecoding
 from pprint import pprint
-from que.prompts import QUERY_SYSTEM_PROMPT
 from que.store import DirectoryStore
 
 def make_llama(
+        model_id: str,
+        quant: str,
         is_verbose: bool = False,
         ctx_window_size: int = 32_768,
     ) -> Llama:
     """
     Return an instance of a LLama2 model
 
+    Args:
+        model_id: A Huggingface model repo
+        quant: a valid expression pointing to a .gguf file in the `model_id` repository
     Kwargs:
         is_verbose: Enable the model's verbose logging
         ctx_window_size: The size of the context window
@@ -19,11 +23,10 @@ def make_llama(
     Returns:
         a LLama instance
     """
-    model_id = "cognitivecomputations/dolphin-2.9-llama3-8b-gguf"
 
     model = Llama.from_pretrained(
         repo_id=model_id,
-        filename="*q5_K_M.gguf",
+        filename=quant,
         n_ctx=ctx_window_size,
         n_gpu_layers=-1,
         chat_format='chatml',
@@ -36,16 +39,18 @@ def make_llama(
 def oneshot_query(
     llm: Llama,
     query: str,
+    query_system_prompt: str,
     context: str,
     is_verbose: bool = False,
     continues: bool = False
-    ) -> str | Tuple[str, List[Dict[str, str]]]:
+    ) -> Tuple[str, List[Dict[str, str]]]:
     """
     Performs a LLM text generation
 
     Args:
         llm: A LLama2 instance
         query: The user query
+        query_system_prompt: The system prompt for the query
         context: The document chunks retrieved
 
     Kwargs:
@@ -59,7 +64,7 @@ def oneshot_query(
     messages = [
         {
           "role": "system", 
-          "content": QUERY_SYSTEM_PROMPT.format(context=context)
+          "content": query_system_prompt.format(context=context)
         },
         {
           "role": "user",
@@ -69,13 +74,14 @@ def oneshot_query(
     
     llm_response = llm_do_chat(llm, messages, is_verbose=is_verbose)
 
-    return llm_response if not continues else (llm_response, messages)
+    return (llm_response, messages)
 
 
 def continue_as_interactive_query(
         llm: Llama,
         db: DirectoryStore,
         messages: List[Dict[str, str]],
+        context_template: str,
         print_hook: None | Callable = None,
         is_verbose: bool = False, 
         dir_scope: str | None = None
@@ -87,6 +93,7 @@ def continue_as_interactive_query(
         llm: A LLama2 instance
         db: The DirectoryStore instance, used for further context retrieval
         messages: The message log used for a first llm completion
+        context_template: The template to use for displaying context
 
     Kwargs:
         is_verbose: Enable verbose logging
@@ -108,7 +115,7 @@ def continue_as_interactive_query(
             messages += [
                 {
                     'role': 'system',
-                    'content': db.format_context(followup_context)
+                    'content': db.format_context(followup_context, context_template)
                 },
                 {
                     'role': 'user',
