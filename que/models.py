@@ -4,14 +4,14 @@ from llama_cpp.llama_speculative import LlamaPromptLookupDecoding
 from pprint import pprint
 from que.store import DirectoryStore
 
-def make_llama(
+def make_model(
         model_id: str,
         quant: str,
         is_verbose: bool = False,
         ctx_window_size: int = 32_768,
     ) -> Llama:
     """
-    Return an instance of a LLama2 model
+    Return an instance of a llama-cpp compatible model
 
     Args:
         model_id: A Huggingface model repo
@@ -21,7 +21,7 @@ def make_llama(
         ctx_window_size: The size of the context window
 
     Returns:
-        a LLama instance
+        a model instance
     """
 
     model = Llama.from_pretrained(
@@ -36,7 +36,7 @@ def make_llama(
 
     return model
 
-def oneshot_query(
+def oneshot_session(
     llm: Llama,
     query: str,
     query_system_prompt: str,
@@ -77,9 +77,10 @@ def oneshot_query(
     return (llm_response, messages)
 
 
-def continue_as_interactive_query(
+def continue_as_interactive_session(
         llm: Llama,
         db: DirectoryStore,
+        k_for_query: int,
         messages: List[Dict[str, str]],
         context_template: str,
         print_hook: None | Callable = None,
@@ -92,6 +93,7 @@ def continue_as_interactive_query(
     Args:
         llm: A LLama2 instance
         db: The DirectoryStore instance, used for further context retrieval
+        k_for_query: The number of documents to retrieve in each query
         messages: The message log used for a first llm completion
         context_template: The template to use for displaying context
 
@@ -109,6 +111,7 @@ def continue_as_interactive_query(
 
             followup_context = db.query(
                 followup_query,
+                k_for_query,
                 dir_scope=dir_scope
             )
 

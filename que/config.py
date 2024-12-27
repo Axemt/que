@@ -24,7 +24,10 @@ def load_default_config(file_needs_creating: bool = False) -> Dict[str, Any]:
         default_config = toml.load(f)
 
     if file_needs_creating:
-        with open(USR_CONFIG_PATH, 'w') as f:
+        if not os.path.exists(CONFIG_FOLDER):
+            os.makedirs(CONFIG_FOLDER)
+        
+        with open(USR_CONFIG_PATH, 'x') as f:
             toml.dump(default_config, f)
 
     return default_config
@@ -41,18 +44,18 @@ def __assert_config_format(
 
 def __assert_has_format_fields(
         s: str,
-        fields: List[str],
+        expected_format_fields: List[str],
         NOT_PRESENT_MSG: str = '{field} is expected to be a format field of this string, but it was not found:\nstr:{s}'
     ):
 
-    for format_field in fields:
+    for format_field in expected_format_fields:
         assert '{' + format_field + '}' in s, NOT_PRESENT_MSG.format(field=format_field, s=s)
 
 def assert_config_format(config: Dict[str, Any]):
 
     __assert_config_format(config,['verbose', 'documents', 'prompts', 'model'])
     
-    __assert_config_format(config['documents'], ['n_documents_per_query'])
+    __assert_config_format(config['documents'], ['n_documents_per_query', 'chunk_size', 'chunk_step', 'embedding_model'])
     
     __assert_config_format(config['prompts'], ['system_prompt', 'followup_prompt', 'context_template'])
     prompts = config['prompts']

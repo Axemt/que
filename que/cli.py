@@ -1,8 +1,8 @@
 import argparse
 from que.store import DirectoryStore
-from que.models import make_llama, oneshot_query, continue_as_interactive_query
+from que.models import make_model, oneshot_session, continue_as_interactive_session
 from que.config import QUECONFIG
-from ast import literal_eval
+from json import loads
 from typing import Dict
 from os import path
 from pprint import pprint
@@ -65,13 +65,23 @@ def main_query(*args, **kwargs):
     err_msg_both_interactive_and_query_only_flags = f'Query only flag = {is_query_only} and Interactive flag = {is_interactive}, but only one is allowed'
     assert is_query_only ^ is_interactive or (is_query_only == is_interactive and not is_interactive), err_msg_both_interactive_and_query_only_flags
     
-    db = DirectoryStore(k=k, is_verbose=is_verbose)
+    if is_verbose:
+        print('Loaded configuration:')
+        pprint(QUECONFIG)
+
+    db = DirectoryStore(
+        chunk_size=QUECONFIG['documents']['chunk_size'],
+        chunk_step=QUECONFIG['documents']['chunk_step'],
+        is_verbose=is_verbose,
+        st_embedding_model=QUECONFIG['documents']['embedding_model'],
+    )
 
     is_scoped_local_search = args.local
     dir_scope = None if not is_scoped_local_search else '.'
 
     context = db.query(
         args.query,
+        k,
         dir_scope=dir_scope
     )
 
@@ -79,13 +89,13 @@ def main_query(*args, **kwargs):
         print(db.format_context(context, QUECONFIG['prompts']['context_template']).replace( path.expanduser('~'), '~' ))
         exit()
 
-    llm = make_llama(
+    llm = make_model(
         QUECONFIG['model']['model_id'],
         QUECONFIG['model']['quant'],
         is_verbose=is_verbose
     )
 
-    llm_response, messages = oneshot_query(
+    llm_response, messages = oneshot_session(
         llm=llm,
         query=query,
         query_system_prompt=QUECONFIG['prompts']['system_prompt'],
@@ -105,9 +115,10 @@ def main_query(*args, **kwargs):
     if not is_interactive:
         exit()
 
-    continue_as_interactive_query(
+    continue_as_interactive_session(
         llm,
         db,
+        k,
         messages,
         QUECONFIG['prompts']['context_template'],
         is_verbose=is_verbose,
@@ -120,15 +131,15 @@ def highlight(s):
 
 def format_context_highlight(llm_response: Dict[str, str], context: Dict) -> str:
 
-    llm_response = literal_eval(llm_response)
+    llm_response = loads(llm_response)
 
     res = ''
     res += highlight(llm_response['answer']) + '\n\n'
-    res += '-'*10 + f"confidence in answer:{llm_response['confidence_score']}" + '-'*10 + '\n\n'
+    res += '-'*10 + f"confidence in answer:{llm_response['confidence_score']}" + '-'*10
     
     if not llm_response['found_an_answer']:
         return res
-
+    res += '\n\n'
 
     for doc_text, meta in zip(context['documents'][0], context['metadatas'][0]):
         

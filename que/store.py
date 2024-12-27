@@ -3,6 +3,8 @@ import chromadb
 import glob
 import os
 import hashlib
+import chromadb.utils
+import chromadb.utils.embedding_functions
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
@@ -10,18 +12,18 @@ from pdfminer.high_level import extract_text as read_pdf_file
 from pdfminer.pdfdocument import PDFTextExtractionNotAllowed
 from pdfminer.psparser import PSSyntaxError
 from warnings import warn
-from docx import Document
-
+import docx
+import torch
 
 class DirectoryStore:
 
 
     def __init__(
-            self, 
-            window_size: int = 50,
-            step_size: int = 50,
-            k: int = 5,
-            is_verbose: bool = False
+            self,
+            chunk_size: int,
+            chunk_step: int,
+            st_embedding_model: str,
+            is_verbose: bool = False,
         ) -> None:
         
         self.config_folder =  os.path.expanduser('~') + '/.config/que'
@@ -29,13 +31,19 @@ class DirectoryStore:
 
         self.v = is_verbose
 
-        self.k = k
-        self.step_size = step_size
-        self.window_size = window_size
+        self.chunk_step = chunk_step
+        self.chunk_size = chunk_size
+        self.embedding_model = st_embedding_model
 
-
+        device = 'cuda' if torch.cuda.is_available() else (
+            'mps' if torch.backends.mps.is_available() else 'cpu'
+        )
         self.collection = chromadb.PersistentClient(path=self.findex_name).get_or_create_collection(
-            name='tomes'
+            name='tomes',
+            embedding_function=chromadb.utils.embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name=self.embedding_model,
+                device=device
+            )
         )
 
         # update with new data
@@ -75,7 +83,7 @@ class DirectoryStore:
 
 
             if os.path.exists(abs_fname):
-                current_fingerprint = get_file_fingerprint(abs_fname)
+                current_fingerprint = self.get_file_fingerprint(abs_fname, self.embedding_model)
                 stored_fingerprint = doc_meta['fingerprint']
 
                 if current_fingerprint != stored_fingerprint:
@@ -217,7 +225,7 @@ class DirectoryStore:
 
         ids = [ f'{abs_fname}-chk-{i}' for i in range(len(txt_chunks))]
 
-        if fingerprint is None: fingerprint = get_file_fingerprint(abs_fname)
+        if fingerprint is None: fingerprint = self.get_file_fingerprint(abs_fname, self.embedding_model)
         metadatas = [ 
             {
                 'source': abs_fname,
@@ -248,10 +256,10 @@ class DirectoryStore:
 
 
         sentences = []
-        for i in range(0 , len(text_tokens) , self.step_size):
-            sentence = text_tokens[i : i + self.window_size]
+        for i in range(0 , len(text_tokens) , self.chunk_step):
+            sentence = text_tokens[i : i + self.chunk_size]
             
-            if (len(sentence) < self.window_size):
+            if (len(sentence) < self.chunk_size):
                 sentences.append(sentence)
                 break
 
@@ -261,8 +269,9 @@ class DirectoryStore:
         return paragraphs
     
     def query(
-        self, 
+        self,
         query_txt: str,
+        k: int,
         dir_scope: str = None
         ) -> str | Dict:
         """
@@ -270,11 +279,12 @@ class DirectoryStore:
 
         Args:
             query_txt: The query, in text form
+            k: The number of documents to retrieve
 
         Kwargs: 
             dir_scope: Restrict the query to documents within the `dir_scope` folder.
         Returns:
-            Formatted string with the documents or raw DB query results
+            Raw DB query results
         """
         if self.v:
             print(f'Querying DB with {self.collection.count()} text snippets...')
@@ -303,7 +313,7 @@ class DirectoryStore:
 
         results = self.collection.query(
             query_texts=query_txt,
-            n_results=self.k,
+            n_results=k,
             include=['documents', 'metadatas'],
             where=dir_scope
         )
@@ -329,6 +339,35 @@ class DirectoryStore:
             res += context_template.format(fname=meta['source'], snippet=snippet.strip())
 
         return res
+    
+    @staticmethod
+    def get_file_fingerprint(
+        abs_fname: str | os.PathLike,
+        built_with: str,
+        hard_digest: bool = False
+        ) -> str:
+        """
+        Calculate a fingerprint of the file contents
+
+        Args:
+            abs_fname: The absolute path of the file to fingerprint
+
+        Kwargs:
+            hard_digest: Hash the file instead of the file metadata
+        
+        Returns:
+            The file fingerprint
+        """
+
+        if hard_digest:
+            with open(abs_fname, 'rb') as f:
+                f_info = f.read()
+        else:
+            fstat = os.stat(abs_fname)
+
+            f_info = f'{abs_fname}<//>{fstat.st_size}-{fstat.st_mtime}-{fstat.st_ctime}'.encode('utf-8')
+        
+        return hashlib.md5(f_info).hexdigest()
 
         
 def read_file(abs_fname: str | os.PathLike) -> str:
@@ -391,7 +430,7 @@ def read_docx_file(abs_fname: str | os.PathLike) -> str:
     Returns:
         The text content of the file
     """
-    doc = Document(abs_fname)
+    doc = docx.Document(abs_fname)
     full_text = []
     for para in doc.paragraphs:
         full_text.append(para.text)
@@ -408,31 +447,3 @@ def read_epub_file(abs_fname: str | os.PathLike) -> str:
             content += BeautifulSoup(body_content).get_text().strip()
 
     return content
-
-
-def get_file_fingerprint(
-        abs_fname: str | os.PathLike, 
-        hard_digest: bool = False
-    ) -> str:
-    """
-    Calculate a fingerprint of the file contents
-
-    Args:
-        abs_fname: The absolute path of the file to fingerprint
-
-    Kwargs:
-        hard_digest: Hash the file instead of the file metadata
-    
-    Returns:
-        The file fingerprint
-    """
-
-    if hard_digest:
-        with open(abs_fname, 'rb') as f:
-            f_info = f.read()
-    else:
-        fstat = os.stat(abs_fname)
-
-        f_info = f'{abs_fname}<//>{fstat.st_size}-{fstat.st_mtime}-{fstat.st_ctime}'.encode('utf-8')
-    
-    return hashlib.md5(f_info).hexdigest()
